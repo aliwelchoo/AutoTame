@@ -1,16 +1,17 @@
 [gd_scene load_steps=3 format=3 uid="uid://cfp8fcr7p5aiu"]
 
-[ext_resource type="Script" path="res://Terrain.gd" id="1_n5u7n"]
+[ext_resource type="PackedScene" uid="uid://rtt0xwo1lf20" path="res://Terrain.tscn" id="1_n8lwc"]
 [ext_resource type="PackedScene" uid="uid://da2x3xe15whnv" path="res://Player.tscn" id="2_lwmtx"]
 
 [node name="World" type="Node3D"]
 
 [node name="DirectionalLight3d" type="DirectionalLight3D" parent="."]
-transform = Transform3D(-0.562407, 0.0317678, -0.82625, -0.667829, 0.57175, 0.476557, 0.487547, 0.819813, -0.300341, -7.26741, 19.9902, -2.49645)
-
-[node name="Terrain" type="Node3D" parent="."]
-script = ExtResource("1_n5u7n")
+transform = Transform3D(-0.329527, -0.145772, -0.932825, -0.808523, 0.553767, 0.19908, 0.487547, 0.819813, -0.300341, -11.2058, 15.1357, -4.764)
 
 [node name="Player" parent="." instance=ExtResource("2_lwmtx")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.3961, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
 disable_mode = 1
+
+[node name="OmniLight3d" type="OmniLight3D" parent="Player"]
+
+[node name="Terrain" parent="." instance=ExtResource("1_n8lwc")]

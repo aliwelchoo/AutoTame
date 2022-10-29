@@ -1,22 +1,47 @@
-[gd_scene load_steps=4 format=3 uid="uid://da2x3xe15whnv"]
+[gd_scene load_steps=8 format=3 uid="uid://da2x3xe15whnv"]
 
 [ext_resource type="Script" path="res://Player.gd" id="1_17qor"]
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_5bn2r"]
+[sub_resource type="CylinderMesh" id="CylinderMesh_ndphj"]
 
-[sub_resource type="CylinderShape3D" id="CylinderShape3D_jookg"]
+[sub_resource type="SphereShape3D" id="SphereShape3D_xp18q"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_0siwa"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4q48h"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_0n0re"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8n27r"]
+transparency = 1
+albedo_color = Color(1, 1, 0, 0.109804)
 
 [node name="Player" type="CharacterBody3D"]
 disable_mode = 2
 script = ExtResource("1_17qor")
 
-[node name="MeshInstance3d" type="MeshInstance3D" parent="."]
-mesh = SubResource("CylinderMesh_5bn2r")
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("CylinderMesh_ndphj")
 
 [node name="CollisionShape3d" type="CollisionShape3D" parent="."]
-shape = SubResource("CylinderShape3D_jookg")
+shape = SubResource("SphereShape3D_xp18q")
 
 [node name="Head" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.932729, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.34095, 0)
 
 [node name="Camera" type="Camera3D" parent="Head"]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0.49317, 0)
+
+[node name="RayCast3d" type="RayCast3D" parent="Head/Camera"]
+target_position = Vector3(0, 0, -4)
+
+[node name="MeshInstance3d" type="MeshInstance3D" parent="Head/Camera"]
+transform = Transform3D(0.01, 0, 0, 0, 0.01, 0, 0, 0, 0.01, 0, 0, -1)
+mesh = SubResource("BoxMesh_0siwa")
+surface_material_override/0 = SubResource("StandardMaterial3D_4q48h")
+
+[node name="BlockOutline" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.00409, 0, 1.00409, 0, 1.42, 0, -1.00409, 0, 1.00409, 0, 0, -2)
+mesh = SubResource("BoxMesh_0n0re")
+surface_material_override/0 = SubResource("StandardMaterial3D_8n27r")

@@ -1,19 +1,27 @@
 extends MeshInstance3D
-@tool
 
-var HEIGHT = G.CHUNK_HEIGHT
-var HEIGHT_NODES = HEIGHT + 1
-var WIDTH = G.CHUNK_WIDTH + 1
-var WIDTH_NODES = WIDTH + 1
-var NOISE_THRESHOLD = 0
-var SMOOTH = G.SMOOTH
-var POSITION = Vector3(0,-HEIGHT/2.0,0)
+var HEIGHT
+var HEIGHT_NODES
+var WIDTH
+var WIDTH_NODES
+var NOISE_THRESHOLD 
+var SMOOTH
+var POSITION
 var mesh_data = []
 var vertices = []
 var indices = []
+var normals = []
+var tangents = []
+var uvs = []
 var noise
 
 func init(x, z):
+	HEIGHT = G.CHUNK_HEIGHT
+	HEIGHT_NODES = HEIGHT + 1
+	WIDTH = G.CHUNK_WIDTH
+	WIDTH_NODES = WIDTH + 1
+	NOISE_THRESHOLD = 0
+	SMOOTH = G.SMOOTH
 	POSITION = Vector3(x, -HEIGHT/2.0, z)
 	
 const CUBE_CORNERS = [
@@ -293,7 +301,7 @@ const EDGE_INDICES = [
 func config_from_cube(cube):
 	var configurationIndex = 0
 	for i in range(len(CUBE_CORNERS)):
-		if cube[i] < NOISE_THRESHOLD:
+		if cube[i]:
 			configurationIndex |= 1 << i
 	return configurationIndex
 
@@ -318,7 +326,8 @@ func march_cube_indices(cube_pos):
 	var end_val
 	var difference
 	for corner_vec in CUBE_CORNERS:
-		cube.append(G.grid_values[G.key_vec(cube_pos + corner_vec)])
+		var corner = cube_pos + corner_vec
+		cube.append(G.grid_values[G.key_vec(corner)] - corner.y < NOISE_THRESHOLD)
 	config_index = config_from_cube(cube)
 	edge_indices = EDGE_INDICES[config_index]
 	for i in range(0,16,3):
@@ -330,8 +339,8 @@ func march_cube_indices(cube_pos):
 			edge_start = cube_pos + CUBE_CORNERS[edge[0]]
 			edge_end = cube_pos + CUBE_CORNERS[edge[1]]
 			if SMOOTH:
-				start_val = G.grid_values[G.key_vec(edge_start)]
-				end_val = G.grid_values[G.key_vec(edge_end)]
+				start_val = G.grid_values[G.key_vec(edge_start)] -edge_start.y
+				end_val = G.grid_values[G.key_vec(edge_end)] -edge_end.y
 				difference = end_val - start_val
 				if difference == 0:
 					difference = 0.5
@@ -348,9 +357,36 @@ func march_cube_indices(cube_pos):
 			else:
 				vertices.append(cc_vert)
 				indices.append(len(vertices)-1)
+				add_mesh_info_at_xz(cc_vert.x, cc_vert.z)
 	return
 
-func _ready():
+func add_mesh_info_at_xz(x, z):
+	var dn = 0.1
+	
+#	var z_1 = height_at_pos(x,z-1)
+#	var z0 = height_at_pos(x,z)
+#	var z1 = height_at_pos(x,z+1)
+#	var tz = G.lrp(z0, z1, dn) - G.lrp(z0, z_1, dn)
+#
+#	var x_1 = height_at_pos(x-1,z)
+#	var x0 = height_at_pos(x,z)
+#	var x1 = height_at_pos(x+1,z)
+#	var tx = G.lrp(x0, x1, dn) - G.lrp(x0, x_1, dn)
+	
+	var tx = height_at_pos(x+dn,z) - height_at_pos(x-dn,z)
+	var tz = height_at_pos(x,z+dn) - height_at_pos(x,z-dn)
+	
+	normals.append(Vector3(-tx,1,-tz).normalized())
+	tangents.append(tx)
+	tangents.append(0)
+	tangents.append(tz)
+	tangents.append(1)
+	uvs.append(Vector2(x/G.WORLD_WIDTH +0.5,z/G.WORLD_WIDTH + 0.5))
+
+func height_at_pos(x,z):
+	return noise.get_noise_2d(x, z)*HEIGHT/2
+	
+func update_grid():
 	var this_height
 	noise = FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
@@ -358,10 +394,16 @@ func _ready():
 			for z in range(WIDTH_NODES):
 				if G.grid_values.has(G.key_vec(Vector3(x,0,z)+POSITION)):
 					continue
-				this_height = HEIGHT*(noise.get_noise_2d(x + POSITION.x,z + POSITION.z)+1.0)/2
-				for y in range(HEIGHT_NODES):
-					G.grid_values[G.key_vec(Vector3(x,y,z)+POSITION)] = this_height-y
-				
+				this_height = height_at_pos(x + POSITION.x, z + POSITION.z)
+				G.grid_values[G.key_vec(Vector3(x,0,z)+POSITION)] = this_height
+
+func create_mesh_data():
+	mesh_data = []
+	vertices = []
+	indices = []
+	normals = []
+	tangents = []
+	uvs = []
 	mesh_data.resize(ArrayMesh.ARRAY_MAX)
 	for x in range(WIDTH):
 		for y in range(HEIGHT):
@@ -369,35 +411,19 @@ func _ready():
 				march_cube_indices(Vector3(x,y,z)+POSITION)
 	mesh_data[ArrayMesh.ARRAY_VERTEX] = PackedVector3Array(vertices)
 	mesh_data[ArrayMesh.ARRAY_INDEX] = PackedInt32Array(indices)
+	mesh_data[ArrayMesh.ARRAY_NORMAL] = PackedVector3Array(normals)
+	mesh_data[ArrayMesh.ARRAY_TANGENT] = PackedFloat32Array(tangents)
+	mesh_data[ArrayMesh.ARRAY_TEX_UV] = PackedVector2Array(uvs) 
+
+func update_mesh():
 	mesh = ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data)
-	var mdt = MeshDataTool.new()
-	mdt.create_from_surface(mesh, 0)
-	# Calculate vertex normals, face-by-face.
-	for i in range(mdt.get_face_count()):
-		# Get the index in the vertex array.
-		var a = mdt.get_face_vertex(i, 0)
-		var b = mdt.get_face_vertex(i, 1)
-		var c = mdt.get_face_vertex(i, 2)
-		# Get vertex position using vertex index.
-		var ap = mdt.get_vertex(a)
-		var bp = mdt.get_vertex(b)
-		var cp = mdt.get_vertex(c)
-		# Calculate face normal.
-		var n = (bp - cp).cross(ap - bp).normalized()
-		# Add face normal to current vertex normal.
-		# This will not result in perfect normals, but it will be close.
-		mdt.set_vertex_normal(a, n + mdt.get_vertex_normal(a))
-		mdt.set_vertex_normal(b, n + mdt.get_vertex_normal(b))
-		mdt.set_vertex_normal(c, n + mdt.get_vertex_normal(c))
-
-		# Run through vertices one last time to normalize normals and
-		# set color to normal.
-	for i in range(mdt.get_vertex_count()):
-		var v = mdt.get_vertex_normal(i).normalized()
-		mdt.set_vertex_normal(i, v)
-		mdt.set_vertex_color(i, Color(v.x, v.y, v.z))
-
 	mesh.clear_surfaces()
-	mdt.commit_to_surface(mesh)
+	create_mesh_data()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh_data)
+	var material = preload("res://new_standard_material_3d.tres")
+	mesh.surface_set_material(0, material)
 	create_trimesh_collision()
+	
+func _ready():
+	update_grid()
+	update_mesh()
